@@ -1,44 +1,50 @@
-data "template_file" "windows" {
-template = "${file("${path.module}/scripts/custom_data.ps1")}"
-
-  vars {
-    admin_username = "${var.admin_username}"
-    admin_password = "${var.admin_password}"
-    
+provider "azurerm" {
+  features {
   }
-
-  }
-
-
-
-data "template_file" "consulconfig" {
-   template = "${file("${path.module}/scripts/consul.tpl")}"
-
 }
 
+data "template_file" "windows" {
+  template = file("${path.module}/scripts/custom_data.ps1")
+
+  vars = {
+    admin_username = var.admin_username
+    admin_password = var.admin_password
+  }
+}
+/*
+data "template_file" "consulconfig" {
+  template = file("${path.module}/scripts/consul.tpl")
+  vars = {
+    location = var.location
+    
+  }
+}
+*/
+
 resource "azurerm_resource_group" "windows" {
-  name     = "${var.resource_group}"
-  location = "${var.location}"
+  name     = var.resource_group
+  location = var.location
 }
 
 resource "azurerm_virtual_network" "vnet" {
-  name                = "${var.virtual_network_name}"
-  location            = "${azurerm_resource_group.windows.location}"
-  address_space       = ["${var.address_space}"]
-  resource_group_name = "${azurerm_resource_group.windows.name}"
+  name                = var.virtual_network_name
+  location            = azurerm_resource_group.windows.location
+  address_space       = [var.address_space]
+  resource_group_name = azurerm_resource_group.windows.name
 }
 
 resource "azurerm_subnet" "subnet" {
   name                 = "${var.demo_prefix}subnet"
-  virtual_network_name = "${azurerm_virtual_network.vnet.name}"
-  resource_group_name  = "${azurerm_resource_group.windows.name}"
-  address_prefix       = "${var.subnet_prefix}"
+  virtual_network_name = azurerm_virtual_network.vnet.name
+  resource_group_name  = azurerm_resource_group.windows.name
+  address_prefixes       = [var.subnet_prefix]
 }
+
 # Security group to allow inbound access on port 8200,443,80,22 and 9870-9880
 resource "azurerm_network_security_group" "windows-sg" {
   name                = "${var.demo_prefix}-sg"
-  location            = "${var.location}"
-  resource_group_name = "${azurerm_resource_group.windows.name}"
+  location            = var.location
+  resource_group_name = azurerm_resource_group.windows.name
 
   security_rule {
     name                       = "windows-https"
@@ -112,7 +118,6 @@ resource "azurerm_network_security_group" "windows-sg" {
     destination_address_prefix = "*"
   }
 
-  
   security_rule {
     name                       = "Nomad-run"
     priority                   = 106
@@ -130,16 +135,16 @@ resource "azurerm_network_security_group" "windows-sg" {
 # resource. Terraform will let you know if you're missing a dependency.
 resource "azurerm_network_interface" "windows-nic" {
   name                = "${var.demo_prefix}windows-nic"
-  location            = "${var.location}"
-  resource_group_name = "${azurerm_resource_group.windows.name}"
+  location            = var.location
+  resource_group_name = azurerm_resource_group.windows.name
 
   # network_security_group_id = "${azurerm_network_security_group.windows-sg.id}"
 
   ip_configuration {
     name                          = "${var.demo_prefix}ipconfig"
-    subnet_id                     = "${azurerm_subnet.subnet.id}"
+    subnet_id                     = azurerm_subnet.subnet.id
     private_ip_address_allocation = "Dynamic"
-    public_ip_address_id          = "${azurerm_public_ip.windows-pip.id}"
+    public_ip_address_id          = azurerm_public_ip.windows-pip.id
   }
 }
 
@@ -147,31 +152,29 @@ resource "azurerm_network_interface" "windows-nic" {
 # optionally add a public IP address for Internet-facing applications and 
 # demo environments like this one.
 resource "azurerm_public_ip" "windows-pip" {
-  name                         = "${var.demo_prefix}-ip"
-  location                     = "${var.location}"
-  resource_group_name          = "${azurerm_resource_group.windows.name}"
-  allocation_method            = "Dynamic"
-  domain_name_label            = "${var.hostname}"
+  name                = "${var.demo_prefix}-ip"
+  location            = var.location
+  resource_group_name = azurerm_resource_group.windows.name
+  allocation_method   = "Dynamic"
+  domain_name_label   = var.hostname
 }
 
-
 resource "azurerm_virtual_machine" "windows" {
-  name                  = "demostack-windows-0"
-  location            = "${var.location}"
-  resource_group_name = "${azurerm_resource_group.windows.name}"
-  network_interface_ids = []
-  vm_size               = "Standard_B2s"
+  name                = "demostack-windows-0"
+  location            = var.location
+  resource_group_name = azurerm_resource_group.windows.name
+  vm_size             = "Standard_B2s"
 
-network_interface_ids         = ["${azurerm_network_interface.windows-nic.id}"]
+  network_interface_ids         = [azurerm_network_interface.windows-nic.id]
   delete_os_disk_on_termination = "true"
-
 
   storage_image_reference {
     publisher = "MicrosoftWindowsServer"
     offer     = "WindowsServer"
     sku       = "2016-Datacenter"
+
     // sku       = "2016-Datacenter-Server-Core-smalldisk"
-    version   = "latest"
+    version = "latest"
   }
 
   storage_os_disk {
@@ -181,20 +184,18 @@ network_interface_ids         = ["${azurerm_network_interface.windows-nic.id}"]
     managed_disk_type = "Standard_LRS"
   }
 
-tags {
-    name      = "Guy Barros"
-    ttl       = "24"
-    owner     = "guy@hashicorp.com"
-
+  tags = {
+    name  = "Guy Barros"
+    ttl   = "24"
+    owner = "guy@hashicorp.com"
   }
 
   os_profile {
-    computer_name      = "windows-0"
-    admin_username     = "${var.admin_username}"
-    admin_password     = "${var.admin_password}"
+    computer_name  = "windows-0"
+    admin_username = var.admin_username
+    admin_password = var.admin_password
 
-
-  custom_data   =  <<EOF
+    custom_data = <<EOF
 
   
 Start-Transcript -Path C:\Deploy.Log
@@ -237,65 +238,60 @@ EOF
 
   }
 
-   os_profile_windows_config {  //Here defined autoupdate config and also vm agent config
-    enable_automatic_upgrades = true  
-    provision_vm_agent        = true  
-  
-    winrm = {  //Here defined WinRM connectivity config
-      protocol = "http"  
-    } 
+  os_profile_windows_config {
+    enable_automatic_upgrades = true //Here defined autoupdate config and also vm agent config
 
+    provision_vm_agent = true
+
+    winrm {
+      protocol = "http" //Here defined WinRM connectivity config
+    }
 
     additional_unattend_config {
-            pass = "oobeSystem"
-            component = "Microsoft-Windows-Shell-Setup"
-            setting_name = "AutoLogon"
-            content = "<AutoLogon><Password><Value>${var.admin_password}</Value></Password><Enabled>true</Enabled><LogonCount>1</LogonCount><Username>${var.admin_username}</Username></AutoLogon>"
-        }
+      pass         = "oobeSystem"
+      component    = "Microsoft-Windows-Shell-Setup"
+      setting_name = "AutoLogon"
+      content      = "<AutoLogon><Password><Value>${var.admin_password}</Value></Password><Enabled>true</Enabled><LogonCount>1</LogonCount><Username>${var.admin_username}</Username></AutoLogon>"
+    }
 
-         #Unattend config is to enable basic auth in WinRM, required for the provisioner stage.
-        additional_unattend_config {
-            pass = "oobeSystem"
-            component = "Microsoft-Windows-Shell-Setup"
-            setting_name = "FirstLogonCommands"
-            content = "${file("${path.module}/scripts/FirstLogonCommands.xml")}"
-        }
+    #Unattend config is to enable basic auth in WinRM, required for the provisioner stage.
+    additional_unattend_config {
+      pass         = "oobeSystem"
+      component    = "Microsoft-Windows-Shell-Setup"
+      setting_name = "FirstLogonCommands"
+      content      = file("${path.module}/scripts/FirstLogonCommands.xml")
+    }
+  }
 
-        
-   }  
-
- provisioner "file" {
+  provisioner "file" {
     source      = "${path.module}/scripts/InstallHashicorp.ps1"
     destination = "C:\\Hashicorp\\InstallHashicorp.ps1"
-  
-  connection {
-       type = "winrm"
-            https = false
-            insecure = true
-      user     = "${var.admin_username}"
-      password = "${var.admin_password}"
-      host     = "${azurerm_public_ip.windows-pip.fqdn}"
-    }
-   
 
+    connection {
+      type     = "winrm"
+      https    = false
+      insecure = true
+      user     = var.admin_username
+      password = var.admin_password
+      host     = azurerm_public_ip.windows-pip.fqdn
+    }
   }
 
-   provisioner "file" {
-    content       = "${data.template_file.consulconfig.rendered}"
+/*
+  provisioner "file" {
+    content     = data.template_file.consulconfig.rendered
     destination = "C:\\Hashicorp\\Consul\\config.json"
-  
-  
-  connection {
-       type = "winrm"
-            https = false
-            insecure = true
-      user     = "${var.admin_username}"
-      password = "${var.admin_password}"
-      host     = "${azurerm_public_ip.windows-pip.fqdn}"
+
+    connection {
+      type     = "winrm"
+      https    = false
+      insecure = true
+      user     = var.admin_username
+      password = var.admin_password
+      host     = azurerm_public_ip.windows-pip.fqdn
     }
   }
+  */
   
-
-
 }
- 
+

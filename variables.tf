@@ -5,7 +5,6 @@
 # Terraform code. If you create a variable with no default, the user will be
 # prompted to enter it (or define it via config file or command line flags.)
 
-
 variable "resource_group" {
   description = "The name of your Azure Resource Group."
   default     = "Azure-Vault-GUY-Demo"
@@ -83,10 +82,12 @@ variable "image_version" {
 
 variable "admin_username" {
   description = "Administrator user name"
-  default     = "admin"
+  default     = "guyser"
 }
 
 variable "admin_password" {
   description = "Administrator password"
-  default     = "replace-with-your-password"
+ # default     = "replace-with-your-password"
+ default = "Sup3r5ecret"
 }
+

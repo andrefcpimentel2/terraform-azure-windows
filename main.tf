@@ -171,7 +171,7 @@ resource "azurerm_virtual_machine" "windows" {
   storage_image_reference {
     publisher = "MicrosoftWindowsServer"
     offer     = "WindowsServer"
-    sku       = "2016-Datacenter"
+    sku       = "2019-Datacenter"
 
     // sku       = "2016-Datacenter-Server-Core-smalldisk"
     version = "latest"
@@ -185,9 +185,9 @@ resource "azurerm_virtual_machine" "windows" {
   }
 
   tags = {
-    name  = "Guy Barros"
-    ttl   = "24"
-    owner = "guy@hashicorp.com"
+    name  = "andre"
+    ttl   = "99"
+    owner = "andre@hashicorp.com"
   }
 
   os_profile {
@@ -225,7 +225,7 @@ netsh advfirewall firewall add rule name="Nomad TCP" dir=in action=allow protoco
 netsh advfirewall firewall add rule name="Nomad UDP" dir=in action=allow protocol=UDP localport=4000-5000
 
 
-set-netfirewallprofile -Profile Domain, Public,Private -Enabled false
+Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled False
 
 Write-Host "configure WinRM as a Service"
 net stop winrm
